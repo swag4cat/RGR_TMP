@@ -6,6 +6,8 @@ let map = null;
 let markers = [];
 let currentUser = null;
 
+// ========== ОСНОВНЫЕ ФУНКЦИИ ==========
+
 // Проверка авторизации
 async function checkAuth() {
     const token = localStorage.getItem('access_token');
@@ -21,12 +23,20 @@ async function checkAuth() {
 
         if (response.ok) {
             currentUser = await response.json();
-            document.getElementById('username').innerText = currentUser.username;
+
+            const usernameSpan = document.getElementById('username');
+            if (usernameSpan) usernameSpan.innerText = currentUser.username;
+
             showDashboard();
             loadObjects();
+
             if (currentUser.role === 'admin') {
+                const tabsContainer = document.getElementById('admin-tabs');
+                if (tabsContainer) tabsContainer.classList.remove('hidden');
+                initTabs();
+                loadUsers();
+                loadPendingRequests();
                 loadLogs();
-                document.getElementById('logs-panel').classList.remove('hidden');
             }
         } else {
             localStorage.removeItem('access_token');
@@ -40,14 +50,45 @@ async function checkAuth() {
 
 // Показать форму логина
 function showLoginForm() {
-    document.getElementById('login-form').classList.remove('hidden');
-    document.getElementById('dashboard').classList.add('hidden');
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const dashboard = document.getElementById('dashboard');
+
+    if (loginForm) loginForm.classList.remove('hidden');
+    if (registerForm) registerForm.classList.add('hidden');
+    if (dashboard) dashboard.classList.add('hidden');
+}
+
+// Показать форму регистрации
+function showRegisterForm() {
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const dashboard = document.getElementById('dashboard');
+
+    if (loginForm) loginForm.classList.add('hidden');
+    if (registerForm) registerForm.classList.remove('hidden');
+    if (dashboard) dashboard.classList.add('hidden');
 }
 
 // Показать дашборд
 function showDashboard() {
-    document.getElementById('login-form').classList.add('hidden');
-    document.getElementById('dashboard').classList.remove('hidden');
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const dashboard = document.getElementById('dashboard');
+    const adminTabs = document.getElementById('admin-tabs');
+
+    if (loginForm) loginForm.classList.add('hidden');
+    if (registerForm) registerForm.classList.add('hidden');
+    if (dashboard) dashboard.classList.remove('hidden');
+
+    if (adminTabs) {
+        if (currentUser && currentUser.role === 'admin') {
+            adminTabs.classList.remove('hidden');
+        } else {
+            adminTabs.classList.add('hidden');
+        }
+    }
+
     initMap();
 }
 
@@ -59,6 +100,29 @@ function initMap() {
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 }
+
+// Переключение вкладок
+function initTabs() {
+    const tabs = document.querySelectorAll('.tab-btn');
+    const contents = document.querySelectorAll('.tab-content');
+
+    tabs.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tabId = btn.dataset.tab;
+            contents.forEach(content => content.classList.add('hidden'));
+            document.getElementById(tabId).classList.remove('hidden');
+
+            tabs.forEach(b => {
+                b.classList.remove('bg-blue-600', 'text-white');
+                b.classList.add('text-gray-600');
+            });
+            btn.classList.add('bg-blue-600', 'text-white');
+            btn.classList.remove('text-gray-600');
+        });
+    });
+}
+
+// ========== ОБЪЕКТЫ ==========
 
 // Загрузка объектов
 async function loadObjects() {
@@ -109,23 +173,23 @@ function updateMap(objects) {
 
         const customIcon = L.divIcon({
             html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); ${obj.status === 'alert' ? 'animation: pulse 1s infinite;' : ''}">⚠️</div>`,
-                                     iconSize: [24, 24],
-                                     popupAnchor: [0, -12]
+            iconSize: [24, 24],
+            popupAnchor: [0, -12]
         });
 
         const marker = L.marker([obj.latitude, obj.longitude], { icon: customIcon })
-        .addTo(map)
-        .bindPopup(`
-        <b>${obj.name}</b><br>
-        Тип: ${obj.type}<br>
-        Статус: <span style="color: ${color}">${statusText}</span>
-        `);
+            .addTo(map)
+            .bindPopup(`
+                <b>${obj.name}</b><br>
+                Тип: ${obj.type}<br>
+                Статус: <span style="color: ${color}">${statusText}</span>
+            `);
 
         markers.push(marker);
     });
 }
 
-// Отображение списка объектов
+// Отображение списка объектов в таблице
 function renderObjectsList(objects) {
     const tbody = document.getElementById('objects-table');
     if (!tbody) return;
@@ -133,28 +197,28 @@ function renderObjectsList(objects) {
     const isAdmin = currentUser && currentUser.role === 'admin';
 
     tbody.innerHTML = objects.map(obj => `
-    <tr class="border-b">
-    <td class="p-2">${obj.id}</td>
-    <td class="p-2">${obj.name}</td>
-    <td class="p-2">${obj.type}</td>
-    <td class="p-2">${obj.latitude.toFixed(4)}, ${obj.longitude.toFixed(4)}</td>
-    <td class="p-2">
-    <span class="px-2 py-1 rounded text-xs text-white ${obj.status === 'alert' ? 'bg-red-500' : (obj.status === 'warning' ? 'bg-yellow-500' : 'bg-green-500')}">
-    ${obj.status}
-    </span>
-    </td>
-    <td class="p-2">
-    ${isAdmin ? `
-        <button onclick="deleteObject(${obj.id})" class="text-red-600 hover:text-red-800 mr-2">
-        <i class="fas fa-trash"></i>
-        </button>
-        <button onclick="editObject(${obj.id}, '${obj.name}')" class="text-blue-600 hover:text-blue-800">
-        <i class="fas fa-edit"></i>
-        </button>
-        ` : '-'}
-        </td>
+        <tr class="border-b">
+            <td class="p-2">${obj.id}</td>
+            <td class="p-2">${obj.name}</td>
+            <td class="p-2">${obj.type}</td>
+            <td class="p-2">${obj.latitude.toFixed(4)}, ${obj.longitude.toFixed(4)}</td>
+            <td class="p-2">
+                <span class="px-2 py-1 rounded text-xs text-white ${obj.status === 'alert' ? 'bg-red-500' : (obj.status === 'warning' ? 'bg-yellow-500' : 'bg-green-500')}">
+                    ${obj.status}
+                </span>
+            </td>
+            <td class="p-2">
+                ${isAdmin ? `
+                    <button onclick="deleteObject(${obj.id})" class="text-red-600 hover:text-red-800 mr-2">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button onclick="editObject(${obj.id}, '${obj.name}')" class="text-blue-600 hover:text-blue-800">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                ` : '-'}
+            </td>
         </tr>
-        `).join('');
+    `).join('');
 }
 
 // Удаление объекта
@@ -200,130 +264,262 @@ window.editObject = async (id, oldName) => {
     }
 };
 
-// Панель действий в зависимости от роли
-function updateActionPanel(objects) {
+// ========== ПАНЕЛЬ ДЕЙСТВИЙ ==========
+
+async function updateActionPanel(objects) {
     const panel = document.getElementById('action-panel');
     if (!panel) return;
+    const token = localStorage.getItem('access_token');
 
     if (currentUser.role === 'admin') {
+        // Загружаем операторов
+        let operators = [];
+        try {
+            const usersRes = await fetch(`${API_URL}/users/`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (usersRes.ok) {
+                const allUsers = await usersRes.json();
+                operators = allUsers.filter(u => u.role === 'operator' && (u.status === 'ACTIVE' || u.status === 'active'));
+            }
+        } catch (error) {
+            console.error('Error loading operators:', error);
+        }
+
         panel.innerHTML = `
-        <h2 class="text-lg font-semibold mb-3">Администрирование</h2>
-        <form id="create-object-form" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <input type="text" id="obj-name" placeholder="Название объекта" class="border rounded-lg px-3 py-2" required>
-        <input type="text" id="obj-type" placeholder="Тип (ТЭЦ, подстанция...)" class="border rounded-lg px-3 py-2" required>
-        <input type="text" id="obj-coords" placeholder="Координаты (кликните на карте)" class="border rounded-lg px-3 py-2 bg-gray-100" readonly required>
-        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">+ Добавить объект</button>
-        </form>
-        <div class="mt-2 text-sm text-gray-500">
-        <i class="fas fa-info-circle"></i> Кликните на карте, чтобы выбрать место для объекта
-        </div>
+            <div class="mb-6 pb-4 border-b">
+                <h2 class="text-lg font-semibold mb-3">➕ Добавление объекта</h2>
+                <form id="create-object-form" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <input type="text" id="obj-name" placeholder="Название объекта" class="border rounded-lg px-3 py-2" required>
+                    <input type="text" id="obj-type" placeholder="Тип" class="border rounded-lg px-3 py-2" required>
+                    <input type="text" id="obj-coords" placeholder="Координаты (кликните на карте)" class="border rounded-lg px-3 py-2 bg-gray-100" readonly required>
+                    <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg">+ Добавить</button>
+                </form>
+                <div class="mt-2 text-sm text-gray-500">Кликните на карте, чтобы выбрать место</div>
+            </div>
+
+            <div class="mb-6 pb-4 border-b">
+                <h2 class="text-lg font-semibold mb-3">🔗 Привязка оператора</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <select id="assign-operator-id" class="border rounded-lg px-3 py-2">
+                        <option value="">Выберите оператора</option>
+                        ${operators.map(op => `<option value="${op.id}">${op.username}</option>`).join('')}
+                    </select>
+                    <select id="assign-object-id" class="border rounded-lg px-3 py-2">
+                        <option value="">Выберите объект</option>
+                        ${objects.map(obj => `<option value="${obj.id}">${obj.name}</option>`).join('')}
+                    </select>
+                    <button id="assign-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Привязать</button>
+                </div>
+            </div>
         `;
 
+        // Координаты
         let clickLat = null, clickLng = null;
-
         map.on('click', (e) => {
             clickLat = e.latlng.lat;
             clickLng = e.latlng.lng;
             const coordInput = document.getElementById('obj-coords');
-            if (coordInput) {
-                coordInput.value = `${clickLat.toFixed(6)}, ${clickLng.toFixed(6)}`;
-            }
+            if (coordInput) coordInput.value = `${clickLat.toFixed(6)}, ${clickLng.toFixed(6)}`;
         });
 
-        const form = document.getElementById('create-object-form');
-        if (form) {
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                if (!clickLat) {
-                    alert('Сначала кликните на карте, чтобы выбрать место');
-                    return;
-                }
-
-                const name = document.getElementById('obj-name').value;
-                const type = document.getElementById('obj-type').value;
-                const token = localStorage.getItem('access_token');
-
-                const response = await fetch(`${API_URL}/objects/`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        name: name,
-                        description: '',
-                        type: type,
-                        latitude: clickLat,
-                        longitude: clickLng
-                    })
-                });
-
-                if (response.ok) {
-                    alert('Объект создан!');
-                    loadObjects();
-                    form.reset();
-                                  document.getElementById('obj-coords').value = '';
-                    clickLat = null;
-                } else {
-                    const error = await response.json();
-                    alert('Ошибка: ' + JSON.stringify(error));
-                }
+        // Создание объекта
+        document.getElementById('create-object-form')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!clickLat) return alert('Кликните на карте');
+            const name = document.getElementById('obj-name').value;
+            const type = document.getElementById('obj-type').value;
+            const res = await fetch(`${API_URL}/objects/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ name, type, latitude: clickLat, longitude: clickLng, description: '' })
             });
-        }
+            if (res.ok) {
+                alert('Объект создан');
+                loadObjects();
+                e.target.reset();
+                document.getElementById('obj-coords').value = '';
+                clickLat = null;
+            } else alert('Ошибка');
+        });
+
+        // Привязка
+        document.getElementById('assign-btn')?.addEventListener('click', async () => {
+            const userId = document.getElementById('assign-operator-id').value;
+            const objectId = document.getElementById('assign-object-id').value;
+            if (!userId || !objectId) return alert('Выберите оператора и объект');
+            const res = await fetch(`${API_URL}/admin/assign-operator/${userId}/${objectId}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                alert('Привязано!');
+                loadObjects();
+            } else alert('Ошибка');
+        });
 
     } else if (currentUser.role === 'operator') {
-        panel.innerHTML = `
-        <h2 class="text-lg font-semibold mb-3">Управление объектом</h2>
-        <button id="alert-btn" class="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition text-lg font-bold">
-        <i class="fas fa-exclamation-triangle"></i> ТРЕВОГА!
-        </button>
-        <p class="text-sm text-gray-500 mt-2">Нажмите кнопку для вызова инженера</p>
-        `;
-
-        const alertBtn = document.getElementById('alert-btn');
-        if (alertBtn) {
-            alertBtn.addEventListener('click', async () => {
-                const token = localStorage.getItem('access_token');
-                const response = await fetch(`${API_URL}/objects/1/alert`, {
+        const myObject = objects.find(o => o.id === currentUser.assigned_object_id);
+        if (!myObject) {
+            panel.innerHTML = `<div class="text-red-600">⚠️ Вам не назначен объект</div>`;
+        } else {
+            panel.innerHTML = `
+                <h2 class="text-lg font-semibold mb-3">Объект: ${myObject.name}</h2>
+                <button id="alert-btn" class="bg-red-600 text-white px-6 py-3 rounded-lg text-lg font-bold">🚨 ТРЕВОГА!</button>
+            `;
+            document.getElementById('alert-btn')?.addEventListener('click', async () => {
+                const res = await fetch(`${API_URL}/objects/${myObject.id}/alert`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-
-                if (response.ok) {
-                    alert('Тревога активирована!');
+                if (res.ok) {
+                    alert('Тревога активирована');
                     loadObjects();
-                } else {
-                    alert('Ошибка: ' + response.status);
-                }
+                } else alert('Ошибка');
             });
         }
-
     } else if (currentUser.role === 'engineer') {
-        panel.innerHTML = `
-        <h2 class="text-lg font-semibold mb-3">Инженерная панель</h2>
-        <div class="text-gray-600">Ожидание инцидентов...</div>
-        `;
+        const alertObjects = objects.filter(o => o.status === 'alert');
+        if (alertObjects.length === 0) {
+            panel.innerHTML = `<div class="text-green-600">✅ Нет активных тревог</div>`;
+        } else {
+            panel.innerHTML = `
+                <h2 class="text-lg font-semibold mb-3">⚠️ Активные тревоги</h2>
+                ${alertObjects.map(obj => `
+                    <div class="flex justify-between items-center p-3 bg-red-50 rounded-lg mb-2">
+                        <span class="font-bold">${obj.name}</span>
+                        <button onclick="resolveAlert(${obj.id})" class="bg-green-600 text-white px-4 py-2 rounded-lg">✅ Решено</button>
+                    </div>
+                `).join('')}
+            `;
+        }
     }
 }
 
-// Загрузка логов
+window.resolveAlert = async (objectId) => {
+    const token = localStorage.getItem('access_token');
+    const res = await fetch(`${API_URL}/objects/${objectId}/resolve`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (res.ok) {
+        alert('Инцидент закрыт');
+        loadObjects();
+    } else alert('Ошибка');
+};
+
+// ========== ПОЛЬЗОВАТЕЛИ И ЗАЯВКИ ==========
+
+async function loadUsers() {
+    const token = localStorage.getItem('access_token');
+    try {
+        const res = await fetch(`${API_URL}/users/`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+            const users = await res.json();
+            const tbody = document.getElementById('users-table');
+            if (tbody) {
+                if (users.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4">Нет пользователей</td></tr>`;
+                } else {
+                    tbody.innerHTML = users.map(u => `
+                        <tr class="border-b">
+                            <td class="p-2">${u.id}</td>
+                            <td class="p-2">${u.username}</td>
+                            <td class="p-2">${u.email}</td>
+                            <td class="p-2">${u.role}</td>
+                            <td class="p-2">${u.status}</td>
+                            <td class="p-2"><button onclick="deleteUser(${u.id})" class="text-red-600">Удалить</button></td>
+                        </tr>
+                    `).join('');
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error loading users:', error);
+    }
+}
+
+async function loadPendingRequests() {
+    const token = localStorage.getItem('access_token');
+    try {
+        const res = await fetch(`${API_URL}/users/pending`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+            const users = await res.json();
+            const tbody = document.getElementById('requests-table');
+            if (tbody) {
+                if (users.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4">Нет заявок</td></tr>`;
+                } else {
+                    tbody.innerHTML = users.map(u => `
+                        <tr class="border-b">
+                            <td class="p-2">${u.id}</td>
+                            <td class="p-2">${u.username}</td>
+                            <td class="p-2">${u.email}</td>
+                            <td class="p-2">${new Date(u.created_at).toLocaleString()}</td>
+                            <td class="p-2">
+                                <select id="role-${u.id}" class="border rounded px-2 py-1">
+                                    <option value="operator">Оператор</option>
+                                    <option value="engineer">Инженер</option>
+                                    <option value="admin">Админ</option>
+                                </select>
+                                <button onclick="approveUser(${u.id})" class="bg-green-600 text-white px-3 py-1 rounded ml-2">✅</button>
+                                <button onclick="deleteUser(${u.id})" class="bg-red-600 text-white px-3 py-1 rounded ml-1">❌</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error loading requests:', error);
+    }
+}
+
+window.approveUser = async (userId) => {
+    const roleSelect = document.getElementById(`role-${userId}`);
+    const role = roleSelect?.value || 'operator';
+    const token = localStorage.getItem('access_token');
+    await fetch(`${API_URL}/users/${userId}/approve?role=${role}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    loadPendingRequests();
+    loadUsers();
+};
+
+window.deleteUser = async (userId) => {
+    if (!confirm('Удалить пользователя?')) return;
+    const token = localStorage.getItem('access_token');
+    await fetch(`${API_URL}/users/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    loadPendingRequests();
+    loadUsers();
+};
+
+// ========== ЛОГИ ==========
+
 async function loadLogs() {
     const token = localStorage.getItem('access_token');
     try {
-        const response = await fetch(`${API_URL}/logs/?limit=20`, {
+        const res = await fetch(`${API_URL}/logs/?limit=50`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-
-        if (response.ok) {
-            const logs = await response.json();
+        if (res.ok) {
+            const logs = await res.json();
             const tbody = document.getElementById('logs-table');
             if (tbody) {
                 tbody.innerHTML = logs.map(log => `
-                <tr class="border-b">
-                <td class="p-2">${new Date(log.created_at).toLocaleString()}</td>
-                <td class="p-2">${log.action}</td>
-                <td class="p-2">${JSON.stringify(log.details)}</td>
-                </tr>
+                    <tr class="border-b">
+                        <td class="p-2">${new Date(log.created_at).toLocaleString()}</td>
+                        <td class="p-2">${log.action}</td>
+                        <td class="p-2">${JSON.stringify(log.details)}</td>
+                    </tr>
                 `).join('');
             }
         }
@@ -332,38 +528,75 @@ async function loadLogs() {
     }
 }
 
-// Логаут
+// ========== СОБЫТИЯ ==========
+
 document.getElementById('logout-btn')?.addEventListener('click', () => {
     localStorage.removeItem('access_token');
-    window.location.reload();
+    location.reload();
 });
 
-// Логин
 document.getElementById('login')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const username = document.getElementById('login-username').value;
     const password = document.getElementById('login-password').value;
-
     try {
-        const response = await fetch(`${API_URL}/auth/login`, {
+        const res = await fetch(`${API_URL}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: `username=${username}&password=${password}`
         });
-
-        if (response.ok) {
-            const data = await response.json();
+        if (res.ok) {
+            const data = await res.json();
             localStorage.setItem('access_token', data.access_token);
-            window.location.reload();
+            location.reload();
         } else {
-            document.getElementById('login-error').innerText = 'Неверный логин или пароль';
+            const err = await res.json();
+            document.getElementById('login-error').innerText = err.detail || 'Ошибка';
             document.getElementById('login-error').classList.remove('hidden');
         }
     } catch (error) {
-        document.getElementById('login-error').innerText = 'Ошибка соединения с сервером';
+        document.getElementById('login-error').innerText = 'Ошибка соединения';
         document.getElementById('login-error').classList.remove('hidden');
     }
 });
 
+document.getElementById('register')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('reg-username').value;
+    const email = document.getElementById('reg-email').value;
+    const password = document.getElementById('reg-password').value;
+    try {
+        const res = await fetch(`${API_URL}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, email, password })
+        });
+        if (res.ok) {
+            document.getElementById('register-success').innerText = 'Регистрация успешна! Ожидайте подтверждения.';
+            document.getElementById('register-success').classList.remove('hidden');
+            setTimeout(() => showLoginForm(), 2000);
+        } else {
+            const err = await res.json();
+            document.getElementById('register-error').innerText = err.detail || 'Ошибка';
+            document.getElementById('register-error').classList.remove('hidden');
+        }
+    } catch (error) {
+        document.getElementById('register-error').innerText = 'Ошибка соединения';
+        document.getElementById('register-error').classList.remove('hidden');
+    }
+});
+
+document.getElementById('show-register')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    showRegisterForm();
+});
+
+document.getElementById('show-login')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    showLoginForm();
+});
+
 // Запуск
-checkAuth();
+document.addEventListener('DOMContentLoaded', () => {
+    checkAuth();
+});

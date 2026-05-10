@@ -7,17 +7,21 @@ class UserCreate(BaseModel):
     username: str
     email: str
     password: str
-    role: str = "operator"
 
 class UserResponse(BaseModel):
     id: int
     username: str
     email: str
     role: str
+    status: str
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+class UserUpdate(BaseModel):
+    role: Optional[str] = None
+    status: Optional[str] = None
 
 # Новые классы для объектов
 class ObjectCreate(BaseModel):

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Инфра Монитор - Дашборд КИИ</title>
+    <title>Инфра Монитор - КИИ Дашборд</title>
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -15,6 +15,9 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%23ef4444'/><path d='M50 20 L50 60 M35 40 L65 40' stroke='white' stroke-width='6' stroke-linecap='round'/><circle cx='50' cy='75' r='5' fill='white'/></svg>">
+
     <style>
         #map { height: 500px; border-radius: 12px; }
         @keyframes pulse {
@@ -23,6 +26,10 @@
         }
         .status-alert {
             animation: pulse 1s infinite;
+        }
+        .tab-btn.active {
+            background-color: #2563eb !important;
+            color: white !important;
         }
     </style>
 </head>
@@ -59,74 +66,136 @@
                     </button>
                 </form>
                 <p id="login-error" class="text-red-500 text-sm mt-4 hidden"></p>
+                <hr class="my-4">
+                <p class="text-center text-sm text-gray-600">
+                    Нет аккаунта? <a href="#" id="show-register" class="text-blue-600 hover:underline">Зарегистрироваться</a>
+                </p>
+            </div>
+        </div>
+
+        <!-- Форма регистрации -->
+        <div id="register-form" class="hidden">
+            <div class="bg-white rounded-lg shadow-lg p-8 max-w-md mx-auto">
+                <h2 class="text-2xl font-bold mb-6 text-center">Регистрация</h2>
+                <form id="register">
+                    <input type="text" id="reg-username" placeholder="Логин" class="w-full border rounded-lg px-4 py-2 mb-4" required>
+                    <input type="email" id="reg-email" placeholder="Email" class="w-full border rounded-lg px-4 py-2 mb-4" required>
+                    <input type="password" id="reg-password" placeholder="Пароль" class="w-full border rounded-lg px-4 py-2 mb-4" required>
+                    <button type="submit" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition">
+                        Зарегистрироваться
+                    </button>
+                </form>
+                <p id="register-error" class="text-red-500 text-sm mt-4 hidden"></p>
+                <p id="register-success" class="text-green-500 text-sm mt-4 hidden"></p>
+                <hr class="my-4">
+                <p class="text-center text-sm text-gray-600">
+                    Уже есть аккаунт? <a href="#" id="show-login" class="text-blue-600 hover:underline">Войти</a>
+                </p>
             </div>
         </div>
 
         <!-- Дашборд -->
         <div id="dashboard" class="hidden">
-            <!-- Статистика -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div class="bg-white rounded-lg shadow p-4">
-                    <div class="text-gray-500 text-sm">Всего объектов</div>
-                    <div id="total-objects" class="text-2xl font-bold">0</div>
+            <!-- Вкладки (только для админа) -->
+            <div class="border-b border-gray-200 mb-6" id="admin-tabs-container" class="hidden">
+                <nav class="flex space-x-2" id="admin-tabs">
+                    <button data-tab="map-tab" class="tab-btn px-4 py-2 font-medium rounded-t-lg bg-blue-600 text-white">📊 Дашборд</button>
+                    <button data-tab="users-tab" class="tab-btn px-4 py-2 font-medium rounded-t-lg text-gray-600 hover:text-blue-600">👥 Пользователи</button>
+                    <button data-tab="requests-tab" class="tab-btn px-4 py-2 font-medium rounded-t-lg text-gray-600 hover:text-blue-600">📝 Заявки</button>
+                    <button data-tab="objects-tab" class="tab-btn px-4 py-2 font-medium rounded-t-lg text-gray-600 hover:text-blue-600">🏭 Объекты</button>
+                    <button data-tab="logs-tab" class="tab-btn px-4 py-2 font-medium rounded-t-lg text-gray-600 hover:text-blue-600">📜 Логи</button>
+                </nav>
+            </div>
+
+            <!-- Вкладка: Дашборд (карта) -->
+            <div id="map-tab" class="tab-content">
+                <!-- Статистика -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="text-gray-500 text-sm">Всего объектов</div>
+                        <div id="total-objects" class="text-2xl font-bold">0</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="text-gray-500 text-sm">В норме</div>
+                        <div id="normal-objects" class="text-2xl font-bold text-green-600">0</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="text-gray-500 text-sm">Тревога</div>
+                        <div id="alert-objects" class="text-2xl font-bold text-red-600">0</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="text-gray-500 text-sm">Инцидентов</div>
+                        <div id="incidents-today" class="text-2xl font-bold">0</div>
+                    </div>
                 </div>
-                <div class="bg-white rounded-lg shadow p-4">
-                    <div class="text-gray-500 text-sm">В норме</div>
-                    <div id="normal-objects" class="text-2xl font-bold text-green-600">0</div>
+
+                <!-- Карта -->
+                <div class="bg-white rounded-lg shadow p-4 mb-6">
+                    <h2 class="text-lg font-semibold mb-3">Карта объектов</h2>
+                    <div id="map"></div>
                 </div>
+
+                <!-- Панель действий -->
+                <div id="action-panel" class="bg-white rounded-lg shadow p-4 mb-6"></div>
+            </div>
+
+            <!-- Вкладка: Пользователи -->
+            <div id="users-tab" class="tab-content hidden">
                 <div class="bg-white rounded-lg shadow p-4">
-                    <div class="text-gray-500 text-sm">Тревога</div>
-                    <div id="alert-objects" class="text-2xl font-bold text-red-600">0</div>
-                </div>
-                <div class="bg-white rounded-lg shadow p-4">
-                    <div class="text-gray-500 text-sm">Инцидентов</div>
-                    <div id="incidents-today" class="text-2xl font-bold">0</div>
+                    <h2 class="text-lg font-semibold mb-3">Пользователи системы</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-100">
+                                <tr><th class="p-2 text-left">ID</th><th class="p-2 text-left">Логин</th><th class="p-2 text-left">Email</th><th class="p-2 text-left">Роль</th><th class="p-2 text-left">Статус</th><th class="p-2 text-left">Действия</th></tr>
+                            </thead>
+                            <tbody id="users-table"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
-            <!-- Карта -->
-            <div class="bg-white rounded-lg shadow p-4 mb-6">
-                <h2 class="text-lg font-semibold mb-3">Карта объектов</h2>
-                <div id="map"></div>
-            </div>
-
-            <!-- Панель действий -->
-            <div id="action-panel" class="bg-white rounded-lg shadow p-4 mb-6"></div>
-
-            <!-- Список объектов -->
-            <div id="objects-list" class="bg-white rounded-lg shadow p-4 mb-6">
-                <h2 class="text-lg font-semibold mb-3">Список объектов</h2>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-100">
-                            <tr>
-                                <th class="p-2 text-left">ID</th>
-                                <th class="p-2 text-left">Название</th>
-                                <th class="p-2 text-left">Тип</th>
-                                <th class="p-2 text-left">Координаты</th>
-                                <th class="p-2 text-left">Статус</th>
-                                <th class="p-2 text-left">Действия</th>
-                            </tr>
-                        </thead>
-                        <tbody id="objects-table"></tbody>
-                    </table>
+            <!-- Вкладка: Заявки -->
+            <div id="requests-tab" class="tab-content hidden">
+                <div class="bg-white rounded-lg shadow p-4">
+                    <h2 class="text-lg font-semibold mb-3">Заявки на регистрацию</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-100">
+                                <tr><th class="p-2 text-left">ID</th><th class="p-2 text-left">Логин</th><th class="p-2 text-left">Email</th><th class="p-2 text-left">Дата регистрации</th><th class="p-2 text-left">Действия</th></tr>
+                            </thead>
+                            <tbody id="requests-table"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
-            <!-- Логи (только админ) -->
-            <div id="logs-panel" class="bg-white rounded-lg shadow p-4 hidden">
-                <h2 class="text-lg font-semibold mb-3">Журнал событий</h2>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-100">
-                            <tr>
-                                <th class="p-2 text-left">Время</th>
-                                <th class="p-2 text-left">Действие</th>
-                                <th class="p-2 text-left">Детали</th>
-                            </tr>
-                        </thead>
-                        <tbody id="logs-table"></tbody>
-                    </table>
+            <!-- Вкладка: Объекты -->
+            <div id="objects-tab" class="tab-content hidden">
+                <div class="bg-white rounded-lg shadow p-4">
+                    <h2 class="text-lg font-semibold mb-3">Список объектов</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-100">
+                                <tr><th class="p-2 text-left">ID</th><th class="p-2 text-left">Название</th><th class="p-2 text-left">Тип</th><th class="p-2 text-left">Координаты</th><th class="p-2 text-left">Статус</th><th class="p-2 text-left">Действия</th></tr>
+                            </thead>
+                            <tbody id="objects-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Вкладка: Логи -->
+            <div id="logs-tab" class="tab-content hidden">
+                <div class="bg-white rounded-lg shadow p-4">
+                    <h2 class="text-lg font-semibold mb-3">Журнал событий</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-100">
+                                <tr><th class="p-2 text-left">Время</th><th class="p-2 text-left">Действие</th><th class="p-2 text-left">Детали</th></tr>
+                            </thead>
+                            <tbody id="logs-table"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

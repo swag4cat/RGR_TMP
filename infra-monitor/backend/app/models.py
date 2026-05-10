@@ -14,6 +14,11 @@ class ObjectStatus(str, enum.Enum):
     ALERT = "alert"
     RESOLVED = "resolved"
 
+class UserStatus(str, enum.Enum):
+    PENDING = "pending"   # ожидает подтверждения
+    ACTIVE = "active"     # активен
+    BLOCKED = "blocked"   # заблокирован
+
 class User(Base):
     __tablename__ = "users"
 
@@ -30,6 +35,8 @@ class User(Base):
 
     # К какому объекту прикреплен (для оператора)
     assigned_object_id = Column(Integer, nullable=True)
+
+    status = Column(Enum(UserStatus), default=UserStatus.PENDING, nullable=False)
 
 
 class InfrastructureObject(Base):

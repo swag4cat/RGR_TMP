@@ -16,33 +16,27 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkeyforjwt12345")
 ALGORITHM = "HS256"
 
-@router.post("/register", response_model=schemas.UserResponse)
+@router.post("/register")
 async def register(user_data: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
-    # Проверка существования пользователя
-    result = await db.execute(
-        select(models.User).where(models.User.username == user_data.username)
-    )
-    existing_user = result.scalar_one_or_none()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already exists"
-        )
+    # Проверка существования
+    result = await db.execute(select(models.User).where(models.User.username == user_data.username))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Username exists")
 
-    # Создание пользователя
-    hashed_password = get_password_hash(user_data.password)
+    # Создаём пользователя со статусом PENDING и ролью по умолчанию
+    hashed = get_password_hash(user_data.password)
     new_user = models.User(
         username=user_data.username,
         email=user_data.email,
-        hashed_password=hashed_password,
-        role=user_data.role
+        hashed_password=hashed,
+        role="operator",  # временно
+        status=models.UserStatus.PENDING
     )
-
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
 
-    return new_user
+    return {"message": "Registration successful. Awaiting admin approval."}
 
 @router.post("/login")
 async def login(
@@ -67,6 +61,13 @@ async def login(
         data={"sub": user.username, "user_id": user.id, "role": user.role}
     )
 
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Incorrect credentials")
+
+    # Проверка статуса
+    if user.status != "active":
+        raise HTTPException(status_code=401, detail="Account not approved by admin")
+
     return {"access_token": access_token, "token_type": "bearer", "user_id": user.id, "role": user.role}
 
 @router.get("/me")
@@ -87,4 +88,9 @@ async def get_current_user(
     if user is None:
         raise HTTPException(status_code=401, detail="User not found")
 
-    return {"id": user.id, "username": user.username, "role": user.role}
+    return {
+    "id": user.id,
+    "username": user.username,
+    "role": user.role,
+    "assigned_object_id": user.assigned_object_id
+}
