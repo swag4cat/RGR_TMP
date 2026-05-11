@@ -53,16 +53,16 @@ class InfrastructureObject(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Кто создал
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
 
 class Incident(Base):
     __tablename__ = "incidents"
 
     id = Column(Integer, primary_key=True, index=True)
-    object_id = Column(Integer, ForeignKey("objects.id"), nullable=False)
-    triggered_by = Column(Integer, ForeignKey("users.id"), nullable=False)  # оператор
-    resolved_by = Column(Integer, ForeignKey("users.id"), nullable=True)    # инженер
+    object_id = Column(Integer, ForeignKey("objects.id", ondelete="CASCADE"), nullable=False)
+    triggered_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    resolved_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     status = Column(Enum(ObjectStatus), default=ObjectStatus.ALERT)
     triggered_at = Column(DateTime(timezone=True), server_default=func.now())
     resolved_at = Column(DateTime(timezone=True), nullable=True)
@@ -72,7 +72,7 @@ class Log(Base):
     __tablename__ = "logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # NULL если система
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     action = Column(String(100), nullable=False)
     details = Column(JSON, nullable=True)
     ip_address = Column(String(45), nullable=True)

@@ -272,50 +272,112 @@ async function updateActionPanel(objects) {
     const token = localStorage.getItem('access_token');
 
     if (currentUser.role === 'admin') {
-        // Загружаем операторов
+        // Загружаем операторов (только активных, с ролью operator)
         let operators = [];
+        let assignments = [];
+
         try {
             const usersRes = await fetch(`${API_URL}/users/`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (usersRes.ok) {
                 const allUsers = await usersRes.json();
-                operators = allUsers.filter(u => u.role === 'operator' && (u.status === 'ACTIVE' || u.status === 'active'));
+                // Фильтруем: только операторы, статус ACTIVE (или active — на всякий случай оба варианта)
+                operators = allUsers.filter(u =>
+                    u.role === 'operator' &&
+                    (u.status === 'ACTIVE' || u.status === 'active')
+                );
+                console.log('Найдено операторов:', operators.length); // Отладка
             }
+
+            // Собираем таблицу привязок
+            const objectsRes = await fetch(`${API_URL}/objects/`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const allObjects = objectsRes.ok ? await objectsRes.json() : [];
+
+            assignments = operators
+                .filter(op => op.assigned_object_id)
+                .map(op => {
+                    const obj = allObjects.find(o => o.id === op.assigned_object_id);
+                    return {
+                        operator_id: op.id,
+                        operator_name: op.username,
+                        object_id: op.assigned_object_id,
+                        object_name: obj ? obj.name : 'Неизвестный объект'
+                    };
+                });
         } catch (error) {
-            console.error('Error loading operators:', error);
+            console.error('Error loading data:', error);
         }
 
         panel.innerHTML = `
+            <!-- Добавление объекта -->
             <div class="mb-6 pb-4 border-b">
                 <h2 class="text-lg font-semibold mb-3">➕ Добавление объекта</h2>
                 <form id="create-object-form" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <input type="text" id="obj-name" placeholder="Название объекта" class="border rounded-lg px-3 py-2" required>
+                    <input type="text" id="obj-name" placeholder="Название" class="border rounded-lg px-3 py-2" required>
                     <input type="text" id="obj-type" placeholder="Тип" class="border rounded-lg px-3 py-2" required>
                     <input type="text" id="obj-coords" placeholder="Координаты (кликните на карте)" class="border rounded-lg px-3 py-2 bg-gray-100" readonly required>
-                    <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg">+ Добавить</button>
+                    <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg">➕ Добавить</button>
                 </form>
                 <div class="mt-2 text-sm text-gray-500">Кликните на карте, чтобы выбрать место</div>
             </div>
 
+            <!-- Привязка оператора -->
             <div class="mb-6 pb-4 border-b">
-                <h2 class="text-lg font-semibold mb-3">🔗 Привязка оператора</h2>
+                <h2 class="text-lg font-semibold mb-3">🔗 Привязка оператора к объекту</h2>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <select id="assign-operator-id" class="border rounded-lg px-3 py-2">
                         <option value="">Выберите оператора</option>
-                        ${operators.map(op => `<option value="${op.id}">${op.username}</option>`).join('')}
+                        ${operators.map(op => `<option value="${op.id}">${op.username} (${op.email || ''})</option>`).join('')}
                     </select>
                     <select id="assign-object-id" class="border rounded-lg px-3 py-2">
                         <option value="">Выберите объект</option>
                         ${objects.map(obj => `<option value="${obj.id}">${obj.name}</option>`).join('')}
                     </select>
-                    <button id="assign-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Привязать</button>
+                    <button id="assign-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg">🔗 Привязать</button>
+                </div>
+            </div>
+
+            <!-- Таблица текущих привязок -->
+            <div class="mb-6">
+                <h2 class="text-lg font-semibold mb-3">📋 Текущие привязки операторов</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm border">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="p-2 text-left">Оператор</th>
+                                <th class="p-2 text-left">Объект</th>
+                                <th class="p-2 text-left">Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody id="assignments-table">
+                            ${assignments.length === 0 ?
+                                `<tr><td colspan="3" class="text-center py-4 text-gray-500">Нет привязанных операторов</td></tr>` :
+                                assignments.map(a => `
+                                    <tr class="border-b">
+                                        <td class="p-2">${a.operator_name} (ID: ${a.operator_id})</td>
+                                        <td class="p-2">${a.object_name} (ID: ${a.object_id})</td>
+                                        <td class="p-2">
+                                            <button onclick="unassignOperator(${a.operator_id})" class="bg-red-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-red-700">
+                                                🔓 Отвязать
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')
+                            }
+                        </tbody>
+                    </table>
                 </div>
             </div>
         `;
 
-        // Координаты
+        // Обработчик клика по карте для координат
         let clickLat = null, clickLng = null;
+
+        // Убираем старый обработчик, если был, и вешаем новый
+        map.off('click');
         map.on('click', (e) => {
             clickLat = e.latlng.lat;
             clickLng = e.latlng.lng;
@@ -324,73 +386,121 @@ async function updateActionPanel(objects) {
         });
 
         // Создание объекта
-        document.getElementById('create-object-form')?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (!clickLat) return alert('Кликните на карте');
-            const name = document.getElementById('obj-name').value;
-            const type = document.getElementById('obj-type').value;
-            const res = await fetch(`${API_URL}/objects/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ name, type, latitude: clickLat, longitude: clickLng, description: '' })
-            });
-            if (res.ok) {
-                alert('Объект создан');
-                loadObjects();
-                e.target.reset();
-                document.getElementById('obj-coords').value = '';
-                clickLat = null;
-            } else alert('Ошибка');
-        });
+        const createForm = document.getElementById('create-object-form');
+        if (createForm) {
+            createForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (!clickLat) return alert('Кликните на карте, чтобы выбрать место');
 
-        // Привязка
-        document.getElementById('assign-btn')?.addEventListener('click', async () => {
-            const userId = document.getElementById('assign-operator-id').value;
-            const objectId = document.getElementById('assign-object-id').value;
-            if (!userId || !objectId) return alert('Выберите оператора и объект');
-            const res = await fetch(`${API_URL}/admin/assign-operator/${userId}/${objectId}`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
+                const name = document.getElementById('obj-name').value;
+                const type = document.getElementById('obj-type').value;
+
+                const res = await fetch(`${API_URL}/objects/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        name,
+                        type,
+                        latitude: clickLat,
+                        longitude: clickLng,
+                        description: ''
+                    })
+                });
+
+                if (res.ok) {
+                    alert('Объект создан');
+                    loadObjects();
+                    createForm.reset();
+                    document.getElementById('obj-coords').value = '';
+                    clickLat = null;
+                } else {
+                    alert('Ошибка создания');
+                }
             });
-            if (res.ok) {
-                alert('Привязано!');
-                loadObjects();
-            } else alert('Ошибка');
-        });
+        }
+
+        // Привязка оператора
+        const assignBtn = document.getElementById('assign-btn');
+        if (assignBtn) {
+            assignBtn.addEventListener('click', async () => {
+                const userId = document.getElementById('assign-operator-id').value;
+                const objectId = document.getElementById('assign-object-id').value;
+
+                if (!userId || !objectId) {
+                    return alert('Выберите оператора и объект');
+                }
+
+                const res = await fetch(`${API_URL}/admin/assign-operator/${userId}/${objectId}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.message && data.message.includes('reassigned')) {
+                        alert('✅ Оператор перепривязан к новому объекту');
+                    } else {
+                        alert('✅ Оператор привязан к объекту');
+                    }
+                    loadObjects();
+                } else {
+                    alert('❌ Ошибка привязки');
+                }
+            });
+        }
 
     } else if (currentUser.role === 'operator') {
         const myObject = objects.find(o => o.id === currentUser.assigned_object_id);
         if (!myObject) {
-            panel.innerHTML = `<div class="text-red-600">⚠️ Вам не назначен объект</div>`;
+            panel.innerHTML = `<div class="text-red-600">⚠️ Вам не назначен объект. Обратитесь к администратору.</div>`;
         } else {
             panel.innerHTML = `
-                <h2 class="text-lg font-semibold mb-3">Объект: ${myObject.name}</h2>
-                <button id="alert-btn" class="bg-red-600 text-white px-6 py-3 rounded-lg text-lg font-bold">🚨 ТРЕВОГА!</button>
+                <h2 class="text-lg font-semibold mb-3">🚨 Управление объектом: ${myObject.name}</h2>
+                <button id="alert-btn" class="bg-red-600 text-white px-6 py-3 rounded-lg text-lg font-bold hover:bg-red-700">
+                    <i class="fas fa-exclamation-triangle"></i> ТРЕВОГА!
+                </button>
             `;
-            document.getElementById('alert-btn')?.addEventListener('click', async () => {
-                const res = await fetch(`${API_URL}/objects/${myObject.id}/alert`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
+
+            const alertBtn = document.getElementById('alert-btn');
+            if (alertBtn) {
+                alertBtn.addEventListener('click', async () => {
+                    const res = await fetch(`${API_URL}/objects/${myObject.id}/alert`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        alert('🚨 Тревога активирована! Инженер будет вызван.');
+                        loadObjects();
+                    } else {
+                        alert('❌ Ошибка');
+                    }
                 });
-                if (res.ok) {
-                    alert('Тревога активирована');
-                    loadObjects();
-                } else alert('Ошибка');
-            });
+            }
         }
+
     } else if (currentUser.role === 'engineer') {
         const alertObjects = objects.filter(o => o.status === 'alert');
         if (alertObjects.length === 0) {
-            panel.innerHTML = `<div class="text-green-600">✅ Нет активных тревог</div>`;
+            panel.innerHTML = `<div class="text-green-600">✅ Нет активных тревог. Отдыхайте :)</div>`;
         } else {
             panel.innerHTML = `
                 <h2 class="text-lg font-semibold mb-3">⚠️ Активные тревоги</h2>
-                ${alertObjects.map(obj => `
-                    <div class="flex justify-between items-center p-3 bg-red-50 rounded-lg mb-2">
-                        <span class="font-bold">${obj.name}</span>
-                        <button onclick="resolveAlert(${obj.id})" class="bg-green-600 text-white px-4 py-2 rounded-lg">✅ Решено</button>
-                    </div>
-                `).join('')}
+                <div class="space-y-2">
+                    ${alertObjects.map(obj => `
+                        <div class="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                            <div>
+                                <span class="font-bold">${obj.name}</span>
+                                <span class="text-sm text-gray-500 ml-2">${obj.type}</span>
+                            </div>
+                            <button onclick="resolveAlert(${obj.id})" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                                <i class="fas fa-check"></i> Решено
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
             `;
         }
     }
@@ -595,6 +705,28 @@ document.getElementById('show-login')?.addEventListener('click', (e) => {
     e.preventDefault();
     showLoginForm();
 });
+
+// Отвязка оператора
+window.unassignOperator = async (userId) => {
+    if (!confirm('Отвязать оператора от объекта?')) return;
+    const token = localStorage.getItem('access_token');
+
+    try {
+        const response = await fetch(`${API_URL}/admin/unassign-operator/${userId}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+            alert('✅ Оператор отвязан от объекта');
+            loadObjects();  // обновит таблицу привязок
+        } else {
+            alert('❌ Ошибка отвязки');
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error);
+    }
+};
 
 // Запуск
 document.addEventListener('DOMContentLoaded', () => {
