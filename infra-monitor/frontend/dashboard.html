@@ -15,6 +15,9 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%23ef4444'/><path d='M50 20 L50 60 M35 40 L65 40' stroke='white' stroke-width='6' stroke-linecap='round'/><circle cx='50' cy='75' r='5' fill='white'/></svg>">
 
@@ -99,9 +102,9 @@
 
         <!-- Дашборд -->
         <div id="dashboard" class="hidden">
-            <!-- Вкладки (только для админа) -->
+            <!-- Вкладки (только для админа будет видно через CSS/JS) -->
             <div class="border-b border-gray-200 mb-6" id="admin-tabs-container">
-                <nav class="flex space-x-2" id="admin-tabs">
+                <nav class="flex space-x-2 flex-wrap" id="admin-tabs">
                     <button data-tab="map-tab" class="tab-btn px-4 py-2 font-medium rounded-t-lg bg-blue-600 text-white">📊 Дашборд</button>
                     <button data-tab="users-tab" class="tab-btn px-4 py-2 font-medium rounded-t-lg text-gray-600 hover:text-blue-600">👥 Пользователи</button>
                     <button data-tab="requests-tab" class="tab-btn px-4 py-2 font-medium rounded-t-lg text-gray-600 hover:text-blue-600">📝 Заявки</button>
@@ -129,6 +132,22 @@
                     <div class="bg-white rounded-lg shadow p-4">
                         <div class="text-gray-500 text-sm">Инцидентов</div>
                         <div id="incidents-today" class="text-2xl font-bold">0</div>
+                    </div>
+                </div>
+
+                <!-- Графики (только для админа) -->
+                <div id="charts-container" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 hidden">
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <h3 class="text-md font-semibold mb-3">📊 Инциденты по дням</h3>
+                        <canvas id="incidentsChart" height="200"></canvas>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <h3 class="text-md font-semibold mb-3">🥧 Объекты по статусам</h3>
+                        <canvas id="statusChart" height="200"></canvas>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4 lg:col-span-2">
+                        <h3 class="text-md font-semibold mb-3">👥 Пользователи по ролям</h3>
+                        <canvas id="usersChart" height="150"></canvas>
                     </div>
                 </div>
 
@@ -215,7 +234,7 @@
 
     <script src="js/app.js"></script>
     <script>
-        // Кнопка экспорта PDF логов (добавляем после загрузки app.js)
+        // Кнопка экспорта PDF логов
         document.addEventListener('DOMContentLoaded', () => {
             const exportBtn = document.getElementById('export-pdf-btn');
             if (exportBtn) {
@@ -248,6 +267,122 @@
                 });
             }
         });
+
+        // Загрузка статистики для админа (графики)
+        async function loadAdminStats() {
+            const token = localStorage.getItem('access_token');
+            if (!token) return;
+
+            try {
+                const response = await fetch('http://localhost:8000/stats/admin', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    const stats = await response.json();
+                    const chartsContainer = document.getElementById('charts-container');
+                    if (chartsContainer) chartsContainer.classList.remove('hidden');
+
+                    // График инцидентов по дням
+                    const ctx1 = document.getElementById('incidentsChart')?.getContext('2d');
+                    if (ctx1 && stats.incidents_by_day) {
+                        new Chart(ctx1, {
+                            type: 'line',
+                            data: {
+                                labels: stats.incidents_by_day.map(d => d.date),
+                                datasets: [{
+                                    label: 'Инциденты',
+                                    data: stats.incidents_by_day.map(d => d.count),
+                                    borderColor: '#ef4444',
+                                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                    tension: 0.3,
+                                    fill: true
+                                }]
+                            },
+                            options: { responsive: true, maintainAspectRatio: true }
+                        });
+                    }
+
+                    // Распределение объектов по статусам
+                    const ctx2 = document.getElementById('statusChart')?.getContext('2d');
+                    if (ctx2 && stats.objects_by_status && stats.objects_by_status.length > 0) {
+                        const statusColors = {
+                            'normal': '#10b981',
+                            'warning': '#f59e0b',
+                            'alert': '#ef4444'
+                        };
+                        new Chart(ctx2, {
+                            type: 'doughnut',
+                            data: {
+                                labels: stats.objects_by_status.map(s => s.status === 'normal' ? 'Норма' : (s.status === 'alert' ? 'Тревога' : 'Внимание')),
+                                datasets: [{
+                                    data: stats.objects_by_status.map(s => s.count),
+                                    backgroundColor: stats.objects_by_status.map(s => statusColors[s.status] || '#6b7280'),
+                                }]
+                            },
+                            options: { responsive: true }
+                        });
+                    }
+
+                    // Пользователи по ролям
+                    const ctx3 = document.getElementById('usersChart')?.getContext('2d');
+                    if (ctx3 && stats.users_by_role && stats.users_by_role.length > 0) {
+                        const roleNames = { 'admin': 'Админы', 'operator': 'Операторы', 'engineer': 'Инженеры' };
+                        new Chart(ctx3, {
+                            type: 'bar',
+                            data: {
+                                labels: stats.users_by_role.map(r => roleNames[r.role] || r.role),
+                                datasets: [{
+                                    label: 'Количество',
+                                    data: stats.users_by_role.map(r => r.count),
+                                    backgroundColor: ['#3b82f6', '#10b981', '#8b5cf6']
+                                }]
+                            },
+                            options: { responsive: true, maintainAspectRatio: true }
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading admin stats:', error);
+            }
+        }
+
+        // Перехватываем загрузку объектов, чтобы после загрузки подтянуть графики для админа
+        const originalLoadObjects = window.loadObjects;
+        if (originalLoadObjects) {
+            window.loadObjects = async function() {
+                await originalLoadObjects();
+                if (window.currentUser && window.currentUser.role === 'admin') {
+                    setTimeout(() => loadAdminStats(), 500);
+                }
+            };
+        }
     </script>
+
+    <script>
+        async function loadStatsDirectly() {
+            const token = localStorage.getItem('access_token');
+            if (!token) return;
+
+            try {
+                const meRes = await fetch('http://localhost:8000/auth/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (meRes.ok) {
+                    const user = await meRes.json();
+                    if (user.role === 'admin') {
+                        console.log('Админ, загружаем графики');
+                        await loadAdminStats();
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Запускаем после загрузки страницы
+        setTimeout(loadStatsDirectly, 1500);
+    </script>
+
 </body>
 </html>
