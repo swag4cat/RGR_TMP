@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход | Инфра Монитор</title>
+
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%23ef4444'/><path d='M50 20 L50 60 M35 40 L65 40' stroke='white' stroke-width='6' stroke-linecap='round'/><circle cx='50' cy='75' r='5' fill='white'/></svg>">
+</head>
+<body class="bg-gray-100">
+    <div class="min-h-screen flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+            <div class="text-center mb-6">
+                <i class="fas fa-shield-alt text-4xl text-red-600"></i>
+                <h2 class="text-2xl font-bold mt-2">Вход в систему</h2>
+                <p class="text-gray-500 text-sm">Инфра Монитор - КИИ Дашборд</p>
+            </div>
+
+            <form id="login-form">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Логин</label>
+                    <input type="text" id="username" placeholder="Введите логин" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Пароль</label>
+                    <input type="password" id="password" placeholder="Введите пароль" class="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+
+                <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition font-semibold">
+                    <i class="fas fa-sign-in-alt"></i> Войти
+                </button>
+            </form>
+
+            <p id="error-message" class="text-red-500 text-sm mt-4 hidden text-center"></p>
+
+            <hr class="my-6">
+
+            <p class="text-center text-sm text-gray-600">
+                Нет аккаунта?
+                <a href="register.html" class="text-blue-600 hover:underline">Зарегистрироваться</a>
+            </p>
+
+            <p class="text-center text-sm text-gray-500 mt-4">
+                <a href="index.html" class="hover:underline">← Вернуться на главную</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `username=${username}&password=${password}`
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    localStorage.setItem('access_token', data.access_token);
+                    window.location.href = 'dashboard.html';
+                } else {
+                    const error = await response.json();
+                    document.getElementById('error-message').innerText = error.detail || 'Ошибка входа';
+                    document.getElementById('error-message').classList.remove('hidden');
+                }
+            } catch (error) {
+                document.getElementById('error-message').innerText = 'Ошибка соединения с сервером';
+                document.getElementById('error-message').classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
