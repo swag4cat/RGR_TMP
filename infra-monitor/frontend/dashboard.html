@@ -42,7 +42,10 @@
                     <i class="fas fa-shield-alt text-2xl text-red-600"></i>
                     <h1 class="text-xl font-bold text-gray-800">Инфра Монитор - КИИ Дашборд</h1>
                 </div>
-                <div id="user-info" class="flex items-center space-x-4">
+                <div class="flex items-center space-x-4">
+                    <a href="index.html" class="text-gray-600 hover:text-blue-600 transition">
+                        <i class="fas fa-home"></i> Главная
+                    </a>
                     <span id="username" class="text-gray-600"></span>
                     <button id="logout-btn" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition">
                         <i class="fas fa-sign-out-alt"></i> Выйти
@@ -97,7 +100,7 @@
         <!-- Дашборд -->
         <div id="dashboard" class="hidden">
             <!-- Вкладки (только для админа) -->
-            <div class="border-b border-gray-200 mb-6" id="admin-tabs-container" class="hidden">
+            <div class="border-b border-gray-200 mb-6" id="admin-tabs-container">
                 <nav class="flex space-x-2" id="admin-tabs">
                     <button data-tab="map-tab" class="tab-btn px-4 py-2 font-medium rounded-t-lg bg-blue-600 text-white">📊 Дашборд</button>
                     <button data-tab="users-tab" class="tab-btn px-4 py-2 font-medium rounded-t-lg text-gray-600 hover:text-blue-600">👥 Пользователи</button>
@@ -187,11 +190,20 @@
             <!-- Вкладка: Логи -->
             <div id="logs-tab" class="tab-content hidden">
                 <div class="bg-white rounded-lg shadow p-4">
-                    <h2 class="text-lg font-semibold mb-3">Журнал событий</h2>
+                    <div class="flex justify-between items-center mb-3">
+                        <h2 class="text-lg font-semibold">Журнал событий</h2>
+                        <button id="export-pdf-btn" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">
+                            <i class="fas fa-file-pdf"></i> Скачать PDF
+                        </button>
+                    </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm">
                             <thead class="bg-gray-100">
-                                <tr><th class="p-2 text-left">Время</th><th class="p-2 text-left">Действие</th><th class="p-2 text-left">Детали</th></tr>
+                                <tr>
+                                    <th class="p-2 text-left">Время</th>
+                                    <th class="p-2 text-left">Действие</th>
+                                    <th class="p-2 text-left">Детали</th>
+                                </tr>
                             </thead>
                             <tbody id="logs-table"></tbody>
                         </table>
@@ -202,5 +214,40 @@
     </div>
 
     <script src="js/app.js"></script>
+    <script>
+        // Кнопка экспорта PDF логов (добавляем после загрузки app.js)
+        document.addEventListener('DOMContentLoaded', () => {
+            const exportBtn = document.getElementById('export-pdf-btn');
+            if (exportBtn) {
+                exportBtn.addEventListener('click', async () => {
+                    const token = localStorage.getItem('access_token');
+                    if (!token) {
+                        alert('Не авторизован');
+                        return;
+                    }
+                    try {
+                        const response = await fetch('http://localhost:8000/logs/export/pdf', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (response.ok) {
+                            const blob = await response.blob();
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `logs_${new Date().toISOString().slice(0,19)}.pdf`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(url);
+                        } else {
+                            alert('Ошибка при скачивании PDF');
+                        }
+                    } catch (error) {
+                        alert('Ошибка: ' + error);
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html>
