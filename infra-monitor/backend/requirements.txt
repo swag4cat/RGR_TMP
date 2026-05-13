@@ -11,3 +11,4 @@ email-validator==2.3.0
 python-multipart==0.0.6
 fastapi-cors==0.0.1
 reportlab==4.2.5
+httpx==0.27.0

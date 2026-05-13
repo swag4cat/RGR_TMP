@@ -1,3 +1,4 @@
+from ..utils.captcha import verify_recaptcha
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,14 @@ from ..database import get_db
 from .. import models, schemas
 from ..auth import verify_password, create_access_token, get_password_hash
 
+from pydantic import BaseModel
+
+class RegisterRequest(BaseModel):
+    username: str
+    email: str
+    password: str
+    captcha_token: str
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -17,20 +26,34 @@ SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkeyforjwt12345")
 ALGORITHM = "HS256"
 
 @router.post("/register")
-async def register(user_data: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
-    # Проверка существования
-    result = await db.execute(select(models.User).where(models.User.username == user_data.username))
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Username exists")
+async def register(user_data: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    # 1. Проверяем капчу
+    is_valid_captcha = await verify_recaptcha(user_data.captcha_token)
+    if not is_valid_captcha:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid captcha"
+        )
 
-    # Создаём пользователя со статусом PENDING и ролью по умолчанию
+    # 2. Проверка существования пользователя
+    result = await db.execute(
+        select(models.User).where(models.User.username == user_data.username)
+    )
+    existing_user = result.scalar_one_or_none()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already exists"
+        )
+
+    # 3. Создаём пользователя (статус pending)
     hashed = get_password_hash(user_data.password)
     new_user = models.User(
         username=user_data.username,
         email=user_data.email,
         hashed_password=hashed,
         role="operator",  # временно
-        status=models.UserStatus.PENDING
+        status="pending"
     )
     db.add(new_user)
     await db.commit()
