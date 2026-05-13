@@ -1,4 +1,3 @@
-from ..utils.captcha import verify_recaptcha
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,9 +6,11 @@ from datetime import timedelta
 from jose import JWTError, jwt
 import os
 
+from ..utils.captcha import verify_recaptcha
 from ..database import get_db
 from .. import models, schemas
 from ..auth import verify_password, create_access_token, get_password_hash
+from .verification import send_verification
 
 from pydantic import BaseModel
 
@@ -59,7 +60,9 @@ async def register(user_data: RegisterRequest, db: AsyncSession = Depends(get_db
     await db.commit()
     await db.refresh(new_user)
 
-    return {"message": "Registration successful. Awaiting admin approval."}
+    await send_verification(new_user.id, db)  # нужно импортировать
+
+    return {"message": "Registration successful. Check your email for verification code.", "user_id": new_user.id}
 
 @router.post("/login")
 async def login(

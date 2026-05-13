@@ -78,12 +78,20 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    document.getElementById('success-message').innerText = data.message || 'Регистрация успешна! Ожидайте подтверждения администратора.';
+                    // Показываем сообщение об успехе
+                    document.getElementById('success-message').innerText = data.message || 'Регистрация успешна! Проверьте почту для подтверждения.';
                     document.getElementById('success-message').classList.remove('hidden');
                     grecaptcha.reset();
+
+                    // Сохраняем user_id в localStorage
+                    if (data.user_id) {
+                        localStorage.setItem('temp_user_id', data.user_id);
+                    }
+
+                    // Перенаправляем на страницу ввода кода через 2 секунды
                     setTimeout(() => {
-                        window.location.href = 'login.html';
-                    }, 3000);
+                        window.location.href = `verify.html?user_id=${data.user_id}`;
+                    }, 2000);
                 } else {
                     document.getElementById('error-message').innerText = data.detail || 'Ошибка регистрации';
                     document.getElementById('error-message').classList.remove('hidden');

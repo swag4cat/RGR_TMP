@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Подтверждение email | Инфра Монитор</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body class="bg-gray-100">
+    <div class="min-h-screen flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+            <div class="text-center mb-6">
+                <i class="fas fa-envelope text-4xl text-blue-600"></i>
+                <h2 class="text-2xl font-bold mt-2">Подтверждение email</h2>
+                <p class="text-gray-500 text-sm">Введите код, отправленный на вашу почту</p>
+            </div>
+
+            <form id="verify-form">
+                <input type="text" id="code" placeholder="6-значный код" class="w-full border rounded-lg px-4 py-2 mb-4 text-center text-xl" required>
+                <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-check"></i> Подтвердить
+                </button>
+            </form>
+
+            <div id="message" class="mt-4 text-center hidden"></div>
+
+            <p class="text-center text-sm text-gray-500 mt-4">
+                <a href="login.html" class="hover:underline">← Вернуться ко входу</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+
+        // Получаем user_id из URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('user_id');
+
+        if (!userId) {
+            document.getElementById('message').innerText = 'Ошибка: не указан ID пользователя';
+            document.getElementById('message').classList.add('text-red-600', 'hidden');
+        }
+
+        document.getElementById('verify-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const code = document.getElementById('code').value;
+            const messageEl = document.getElementById('message');
+
+            if (!code || code.length !== 6) {
+                messageEl.innerText = 'Введите 6-значный код';
+                messageEl.classList.remove('hidden', 'text-green-600');
+                messageEl.classList.add('text-red-600');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/auth/verify-code`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: parseInt(userId), code: code })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    messageEl.innerText = '✅ Email подтверждён! Теперь дождитесь одобрения администратором.';
+                    messageEl.classList.remove('hidden', 'text-red-600');
+                    messageEl.classList.add('text-green-600');
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 3000);
+                } else {
+                    messageEl.innerText = data.detail || '❌ Неверный или просроченный код';
+                    messageEl.classList.remove('hidden', 'text-green-600');
+                    messageEl.classList.add('text-red-600');
+                }
+            } catch (error) {
+                messageEl.innerText = '❌ Ошибка соединения с сервером';
+                messageEl.classList.remove('hidden', 'text-green-600');
+                messageEl.classList.add('text-red-600');
+            }
+        });
+    </script>
+</body>
+</html>

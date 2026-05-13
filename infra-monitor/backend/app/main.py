@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base
 from . import models
-from .routers import auth, objects, admin, logs, users, stats, logs_export
+from .routers import auth, objects, admin, logs, users, stats, logs_export, verification
 
 app = FastAPI(title="Infra Monitor API", version="1.0.0")
 
@@ -22,6 +22,7 @@ app.include_router(logs.router)
 app.include_router(users.router)
 app.include_router(stats.router)
 app.include_router(logs_export.router)
+app.include_router(verification.router)
 
 @app.on_event("startup")
 async def init_db():
