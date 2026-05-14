@@ -10,7 +10,7 @@ async def verify_recaptcha(token: str) -> bool:
     
     if not secret_key:
         print("WARNING: RECAPTCHA_SECRET_KEY not set, skipping verification")
-        return True  # Для разработки — пропускаем, если нет ключа
+        return True
     
     async with httpx.AsyncClient() as client:
         response = await client.post(

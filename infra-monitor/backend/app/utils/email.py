@@ -2,7 +2,6 @@ import os
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 from dotenv import load_dotenv
 
-# Загружаем переменные окружения
 load_dotenv()
 
 conf = ConnectionConfig(

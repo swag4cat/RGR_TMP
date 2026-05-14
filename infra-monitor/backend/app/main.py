@@ -6,7 +6,6 @@ from .routers import auth, objects, admin, logs, users, stats, logs_export, veri
 
 app = FastAPI(title="Infra Monitor API", version="1.0.0")
 
-# Разрешаем CORS для фронтенда
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],

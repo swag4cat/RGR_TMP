@@ -16,7 +16,7 @@ async def get_logs(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    # Только админ может смотреть логи
+
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin role required")
     

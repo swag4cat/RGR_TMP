@@ -22,7 +22,6 @@ async def assign_operator(
 ):
     await check_admin(current_user)
 
-    # Проверяем пользователя
     user_result = await db.execute(
         select(models.User).where(models.User.id == user_id)
     )
@@ -32,7 +31,6 @@ async def assign_operator(
     if user.role != "operator":
         raise HTTPException(status_code=400, detail="User is not an operator")
 
-    # Проверяем объект
     obj_result = await db.execute(
         select(models.InfrastructureObject).where(models.InfrastructureObject.id == object_id)
     )
@@ -40,14 +38,11 @@ async def assign_operator(
     if not obj:
         raise HTTPException(status_code=404, detail="Object not found")
 
-    # Запоминаем старый объект (если был)
     old_object_id = user.assigned_object_id
 
-    # Назначаем новый объект
     user.assigned_object_id = object_id
     await db.commit()
 
-    # Логируем
     await log_action(
         db,
         user_id=current_user["id"],
@@ -56,7 +51,6 @@ async def assign_operator(
         request=request
     )
 
-    # Возвращаем сообщение в зависимости от того, был ли перепривязан
     if old_object_id:
         return {"message": f"Operator {user.username} reassigned from object {old_object_id} to {object_id}"}
     else:
@@ -71,7 +65,6 @@ async def unassign_operator(
 ):
     await check_admin(current_user)
 
-    # Находим оператора
     result = await db.execute(select(models.User).where(models.User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
@@ -79,12 +72,10 @@ async def unassign_operator(
     if user.role != "operator":
         raise HTTPException(status_code=400, detail="User is not an operator")
 
-    # Отвязываем
     old_object_id = user.assigned_object_id
     user.assigned_object_id = None
     await db.commit()
 
-    # Логируем
     await log_action(
         db,
         user_id=current_user["id"],

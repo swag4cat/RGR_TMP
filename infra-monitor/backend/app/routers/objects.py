@@ -9,7 +9,6 @@ from .auth import get_current_user
 
 router = APIRouter(prefix="/objects", tags=["objects"])
 
-# Вспомогательная функция для проверки роли
 async def check_admin(current_user: dict):
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin role required")
@@ -35,7 +34,6 @@ async def create_object(
     await db.commit()
     await db.refresh(new_object)
     
-    # Логируем
     await log_action(
         db, 
         user_id=current_user["id"],
@@ -54,9 +52,7 @@ async def get_objects(
     result = await db.execute(select(models.InfrastructureObject))
     objects = result.scalars().all()
     
-    # Если оператор — видит только свой объект
     if current_user["role"] == "operator":
-        # Нужно получить assigned_object_id из БД
         user_result = await db.execute(
             select(models.User).where(models.User.id == current_user["id"])
         )
@@ -76,11 +72,10 @@ async def update_status(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    # Проверяем права
+
     if current_user["role"] not in ["admin", "engineer"]:
         raise HTTPException(status_code=403, detail="Not enough permissions")
     
-    # Получаем объект
     result = await db.execute(
         select(models.InfrastructureObject).where(models.InfrastructureObject.id == object_id)
     )
@@ -92,7 +87,6 @@ async def update_status(
     obj.status = status_update.status
     await db.commit()
     
-    # Логируем
     await log_action(
         db,
         user_id=current_user["id"],
@@ -110,11 +104,10 @@ async def trigger_alert(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    # Только оператор может нажать тревогу
+
     if current_user["role"] != "operator":
         raise HTTPException(status_code=403, detail="Only operator can trigger alert")
     
-    # Проверяем, что оператор прикреплен к этому объекту
     user_result = await db.execute(
         select(models.User).where(models.User.id == current_user["id"])
     )
@@ -123,7 +116,6 @@ async def trigger_alert(
     if not user or user.assigned_object_id != object_id:
         raise HTTPException(status_code=403, detail="You are not assigned to this object")
     
-    # Обновляем статус объекта
     result = await db.execute(
         select(models.InfrastructureObject).where(models.InfrastructureObject.id == object_id)
     )
@@ -133,7 +125,6 @@ async def trigger_alert(
     
     obj.status = "alert"
     
-    # Создаем инцидент
     incident = models.Incident(
         object_id=object_id,
         triggered_by=current_user["id"],
@@ -142,7 +133,6 @@ async def trigger_alert(
     db.add(incident)
     await db.commit()
     
-    # Логируем
     await log_action(
         db,
         user_id=current_user["id"],
@@ -160,11 +150,10 @@ async def resolve_alert(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    # Только инженер или админ
+
     if current_user["role"] not in ["engineer", "admin"]:
         raise HTTPException(status_code=403, detail="Engineer or admin role required")
 
-    # Получаем объект
     result = await db.execute(
         select(models.InfrastructureObject).where(models.InfrastructureObject.id == object_id)
     )
@@ -175,10 +164,8 @@ async def resolve_alert(
     if obj.status != "alert":
         raise HTTPException(status_code=400, detail="Object is not in alert state")
 
-    # Обновляем статус
     obj.status = "resolved"
 
-    # Закрываем последний инцидент
     incident_result = await db.execute(
         select(models.Incident)
         .where(models.Incident.object_id == object_id)
@@ -194,7 +181,6 @@ async def resolve_alert(
 
     await db.commit()
 
-    # Логируем
     await log_action(
         db,
         user_id=current_user["id"],

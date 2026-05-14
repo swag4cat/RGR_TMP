@@ -2,7 +2,6 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 
-# Существующие классы
 class UserCreate(BaseModel):
     username: str
     email: str
@@ -23,7 +22,6 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     status: Optional[str] = None
 
-# Новые классы для объектов
 class ObjectCreate(BaseModel):
     name: str
     description: Optional[str] = None

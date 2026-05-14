@@ -18,7 +18,7 @@ async def send_verification(
     user_id: int,
     db: AsyncSession = Depends(get_db)
 ):
-    # Находим пользователя
+
     result = await db.execute(
         select(models.User).where(models.User.id == user_id)
     )
@@ -26,12 +26,10 @@ async def send_verification(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Удаляем старые коды
     await db.execute(
         delete(models.EmailVerification).where(models.EmailVerification.user_id == user_id)
     )
     
-    # Создаём новый код
     code = generate_code()
     expires_at = datetime.now() + timedelta(minutes=10)
     
@@ -43,7 +41,6 @@ async def send_verification(
     db.add(verification)
     await db.commit()
     
-    # Отправляем письмо
     await send_verification_email(user.email, code)
     
     return {"message": "Verification code sent to email"}
@@ -57,7 +54,6 @@ async def verify_code(request_data: VerifyCodeRequest, db: AsyncSession = Depend
     user_id = request_data.user_id
     code = request_data.code
 
-    # Ищем код
     result = await db.execute(
         select(models.EmailVerification).where(
             models.EmailVerification.user_id == user_id,
@@ -70,16 +66,14 @@ async def verify_code(request_data: VerifyCodeRequest, db: AsyncSession = Depend
     if not verification:
         raise HTTPException(status_code=400, detail="Invalid or expired code")
 
-    # Обновляем статус пользователя
     user_result = await db.execute(
         select(models.User).where(models.User.id == user_id)
     )
     user = user_result.scalar_one_or_none()
     if user:
-        user.status = "pending"  # или "active", зависит от логики
+        user.status = "pending"
         user.is_2fa_enabled = True
 
-    # Удаляем использованный код
     await db.delete(verification)
     await db.commit()
 

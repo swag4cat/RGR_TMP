@@ -28,7 +28,7 @@ ALGORITHM = "HS256"
 
 @router.post("/register")
 async def register(user_data: RegisterRequest, db: AsyncSession = Depends(get_db)):
-    # 1. Проверяем капчу
+
     is_valid_captcha = await verify_recaptcha(user_data.captcha_token)
     if not is_valid_captcha:
         raise HTTPException(
@@ -36,7 +36,7 @@ async def register(user_data: RegisterRequest, db: AsyncSession = Depends(get_db
             detail="Invalid captcha"
         )
 
-    # 2. Проверка существования пользователя
+
     result = await db.execute(
         select(models.User).where(models.User.username == user_data.username)
     )
@@ -47,20 +47,19 @@ async def register(user_data: RegisterRequest, db: AsyncSession = Depends(get_db
             detail="Username already exists"
         )
 
-    # 3. Создаём пользователя (статус pending)
     hashed = get_password_hash(user_data.password)
     new_user = models.User(
         username=user_data.username,
         email=user_data.email,
         hashed_password=hashed,
-        role="operator",  # временно
+        role="operator",
         status="pending"
     )
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
 
-    await send_verification(new_user.id, db)  # нужно импортировать
+    await send_verification(new_user.id, db)
 
     return {"message": "Registration successful. Check your email for verification code.", "user_id": new_user.id}
 
@@ -69,7 +68,7 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db)
 ):
-    # Ищем пользователя
+
     result = await db.execute(
         select(models.User).where(models.User.username == form_data.username)
     )
@@ -82,7 +81,6 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Создаем токен
     access_token = create_access_token(
         data={"sub": user.username, "user_id": user.id, "role": user.role}
     )
@@ -90,7 +88,6 @@ async def login(
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect credentials")
 
-    # Проверка статуса
     if user.status != "active":
         raise HTTPException(status_code=401, detail="Account not approved by admin")
 

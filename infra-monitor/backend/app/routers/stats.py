@@ -9,23 +9,21 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 
 @router.get("/public")
 async def get_public_stats(db: AsyncSession = Depends(get_db)):
-    # Общее количество объектов
+
     total_objects_result = await db.execute(select(func.count()).select_from(models.InfrastructureObject))
     total_objects = total_objects_result.scalar()
 
-    # Решённые инциденты (статус resolved)
+
     resolved_incidents_result = await db.execute(
         select(func.count()).select_from(models.Incident).where(models.Incident.status == "resolved")
     )
     resolved_incidents = resolved_incidents_result.scalar()
 
-    # Активные тревоги (объекты со статусом alert)
     active_alerts_result = await db.execute(
         select(func.count()).select_from(models.InfrastructureObject).where(models.InfrastructureObject.status == "alert")
     )
     active_alerts = active_alerts_result.scalar()
 
-    # Количество пользователей по ролям
     admins_result = await db.execute(
         select(func.count()).select_from(models.User).where(models.User.role == "admin", models.User.status == "ACTIVE")
     )
@@ -52,7 +50,6 @@ async def get_public_stats(db: AsyncSession = Depends(get_db)):
 
 @router.get("/admin")
 async def get_admin_stats(db: AsyncSession = Depends(get_db)):
-    # Статистика по инцидентам за последние 7 дней
     today = datetime.now().date()
     incidents_by_day = []
 
@@ -74,14 +71,12 @@ async def get_admin_stats(db: AsyncSession = Depends(get_db)):
             "count": count
         })
 
-    # Распределение объектов по статусам
     status_result = await db.execute(
         select(models.InfrastructureObject.status, func.count())
         .group_by(models.InfrastructureObject.status)
     )
     objects_by_status = [{"status": s, "count": c} for s, c in status_result.all()]
 
-    # Количество пользователей по ролям
     users_result = await db.execute(
         select(models.User.role, func.count())
         .where(models.User.status == "ACTIVE")
