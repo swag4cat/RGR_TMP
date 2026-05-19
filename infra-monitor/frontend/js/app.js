@@ -1,14 +1,9 @@
-// API URL
 const API_URL = 'http://localhost:8000';
 
-// Глобальные переменные
 let map = null;
 let markers = [];
 let currentUser = null;
 
-// ========== ОСНОВНЫЕ ФУНКЦИИ ==========
-
-// Проверка авторизации
 async function checkAuth() {
     const token = localStorage.getItem('access_token');
     if (!token) {
@@ -48,7 +43,6 @@ async function checkAuth() {
     }
 }
 
-// Показать форму логина
 function showLoginForm() {
     const loginForm = document.getElementById('login-form');
     const registerForm = document.getElementById('register-form');
@@ -59,7 +53,6 @@ function showLoginForm() {
     if (dashboard) dashboard.classList.add('hidden');
 }
 
-// Показать форму регистрации
 function showRegisterForm() {
     const loginForm = document.getElementById('login-form');
     const registerForm = document.getElementById('register-form');
@@ -70,7 +63,6 @@ function showRegisterForm() {
     if (dashboard) dashboard.classList.add('hidden');
 }
 
-// Показать дашборд
 function showDashboard() {
     const loginForm = document.getElementById('login-form');
     const registerForm = document.getElementById('register-form');
@@ -92,7 +84,6 @@ function showDashboard() {
     initMap();
 }
 
-// Инициализация карты
 function initMap() {
     if (map) return;
     map = L.map('map').setView([55.7558, 37.6173], 10);
@@ -101,7 +92,6 @@ function initMap() {
     }).addTo(map);
 }
 
-// Переключение вкладок
 function initTabs() {
     const tabs = document.querySelectorAll('.tab-btn');
     const contents = document.querySelectorAll('.tab-content');
@@ -122,9 +112,6 @@ function initTabs() {
     });
 }
 
-// ========== ОБЪЕКТЫ ==========
-
-// Загрузка объектов
 async function loadObjects() {
     const token = localStorage.getItem('access_token');
     try {
@@ -144,7 +131,6 @@ async function loadObjects() {
     }
 }
 
-// Обновление статистики
 function updateStats(objects) {
     document.getElementById('total-objects').innerText = objects.length;
     const normal = objects.filter(o => o.status === 'normal').length;
@@ -154,7 +140,6 @@ function updateStats(objects) {
     document.getElementById('incidents-today').innerText = alert;
 }
 
-// Обновление карты
 function updateMap(objects) {
     markers.forEach(marker => map.removeLayer(marker));
     markers = [];
@@ -189,7 +174,6 @@ function updateMap(objects) {
     });
 }
 
-// Отображение списка объектов в таблице
 function renderObjectsList(objects) {
     const tbody = document.getElementById('objects-table');
     if (!tbody) return;
@@ -221,7 +205,6 @@ function renderObjectsList(objects) {
     `).join('');
 }
 
-// Удаление объекта
 window.deleteObject = async (id) => {
     if (!confirm('Удалить объект?')) return;
     const token = localStorage.getItem('access_token');
@@ -240,7 +223,6 @@ window.deleteObject = async (id) => {
     }
 };
 
-// Редактирование объекта
 window.editObject = async (id, oldName) => {
     const newName = prompt('Введите новое название:', oldName);
     if (!newName || newName === oldName) return;
@@ -264,15 +246,12 @@ window.editObject = async (id, oldName) => {
     }
 };
 
-// ========== ПАНЕЛЬ ДЕЙСТВИЙ ==========
-
 async function updateActionPanel(objects) {
     const panel = document.getElementById('action-panel');
     if (!panel) return;
     const token = localStorage.getItem('access_token');
 
     if (currentUser.role === 'admin') {
-        // Загружаем операторов (только активных, с ролью operator)
         let operators = [];
         let assignments = [];
 
@@ -282,15 +261,13 @@ async function updateActionPanel(objects) {
             });
             if (usersRes.ok) {
                 const allUsers = await usersRes.json();
-                // Фильтруем: только операторы, статус ACTIVE (или active — на всякий случай оба варианта)
                 operators = allUsers.filter(u =>
                     u.role === 'operator' &&
                     (u.status === 'ACTIVE' || u.status === 'active')
                 );
-                console.log('Найдено операторов:', operators.length); // Отладка
+                console.log('Найдено операторов:', operators.length);
             }
 
-            // Собираем таблицу привязок
             const objectsRes = await fetch(`${API_URL}/objects/`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -373,10 +350,8 @@ async function updateActionPanel(objects) {
             </div>
         `;
 
-        // Обработчик клика по карте для координат
         let clickLat = null, clickLng = null;
 
-        // Убираем старый обработчик, если был, и вешаем новый
         map.off('click');
         map.on('click', (e) => {
             clickLat = e.latlng.lat;
@@ -385,7 +360,6 @@ async function updateActionPanel(objects) {
             if (coordInput) coordInput.value = `${clickLat.toFixed(6)}, ${clickLng.toFixed(6)}`;
         });
 
-        // Создание объекта
         const createForm = document.getElementById('create-object-form');
         if (createForm) {
             createForm.addEventListener('submit', async (e) => {
@@ -422,7 +396,6 @@ async function updateActionPanel(objects) {
             });
         }
 
-        // Привязка оператора
         const assignBtn = document.getElementById('assign-btn');
         if (assignBtn) {
             assignBtn.addEventListener('click', async () => {
@@ -518,8 +491,6 @@ window.resolveAlert = async (objectId) => {
     } else alert('Ошибка');
 };
 
-// ========== ПОЛЬЗОВАТЕЛИ И ЗАЯВКИ ==========
-
 async function loadUsers() {
     const token = localStorage.getItem('access_token');
     try {
@@ -612,8 +583,6 @@ window.deleteUser = async (userId) => {
     loadUsers();
 };
 
-// ========== ЛОГИ ==========
-
 async function loadLogs() {
     const token = localStorage.getItem('access_token');
     try {
@@ -637,8 +606,6 @@ async function loadLogs() {
         console.error('Error loading logs:', error);
     }
 }
-
-// ========== СОБЫТИЯ ==========
 
 document.getElementById('logout-btn')?.addEventListener('click', () => {
     localStorage.removeItem('access_token');
@@ -719,7 +686,7 @@ window.unassignOperator = async (userId) => {
 
         if (response.ok) {
             alert('✅ Оператор отвязан от объекта');
-            loadObjects();  // обновит таблицу привязок
+            loadObjects();
         } else {
             alert('❌ Ошибка отвязки');
         }
@@ -728,7 +695,6 @@ window.unassignOperator = async (userId) => {
     }
 };
 
-// Запуск
 document.addEventListener('DOMContentLoaded', () => {
     checkAuth();
 });
